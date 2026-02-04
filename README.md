@@ -4,7 +4,6 @@ Though Telegram allows file uploads, it is not intended to be used as cloud stor
 # Telegram Drop (Local Web UI)
 A local web app that lets you drag-and-drop files and send them to a Telegram channel, plus download recent uploads.
 
-Though I demonstrated Discord in the video too, I haven't included the code here. While I believe that storing your OWN files on Discord does NOT violate TOS, I think that spreading the code to do so might. Idk I'm trying to not actually get banned :)
 
 ## Usage and How to Run
 ### Requirements
