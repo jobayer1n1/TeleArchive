@@ -1,8 +1,8 @@
 # Keep In Mind
 Though Telegram allows file uploads, it is not intended to be used as cloud storage. Your files could be lost at any time. Don't rely on this project (or any similar ones) for storing important files on Telegram. Storing large amounts of files on this **could result in Telegram deleting your files or banning you, proceed at your own risk**.
 
-# Telegram Drop (Local Web UI)
-A local web app that lets you drag-and-drop files and send them to a Telegram channel, plus download recent uploads.
+# TeleArchive (Local Web UI)
+A local web app that lets you drag-and-drop files to a Telegram channel, browse/download recent uploads, and create shareable download links.
 
 
 ## Usage and How to Run
@@ -18,10 +18,24 @@ Before running this, I recommend creating a virtual environment in Python.
 - Create `/.env` and fill in the variables with appropriate values. Here's a description of these values and where you can get them from:
     - `APP_ID` and `APP_HASH`: You can get these from https://my.telegram.org/myapp. **AGAIN, storing large amounts of files could get you banned. So be careful and take precautions if you care about losing your account.**
     - `CHANNEL_LINK`: the link to your Telegram channel.
-    - `SESSION_NAME`: this can be whatever you want, just the name that will be used for the file storing details of your Telegram session.
+    - `SESSION_STRING`: your Telethon session string. Generate it with `python generate_session.py` after setting `APP_ID` and `APP_HASH`.
+    - `PASSKEY`: required. This is the login passkey for the web UI.
+    - `ENCRYPTION_KEY`: optional. If set, files are encrypted before upload and decrypted on download (Fernet key).
+    - `WEB_DB_PATH`: optional. Defaults to `telegram_web.db`.
+    - `WEB_MAX_UPLOAD_BYTES`: optional. Sets Flask max upload size in bytes.
+    - `WEB_HOST`: optional. Defaults to `0.0.0.0`.
+    - `WEB_PORT`: optional. Defaults to `5000`.
+    - `WEB_DEBUG`: optional. Set to `true` to enable Flask debug.
+    - `WEB_SECRET`: optional. Secret key override for the Flask session cookie.
 - Run `pip install -r requirements.txt`.
 - Run `python run.py`
 - Open `http://127.0.0.1:5000` in your browser.
+
+### What You Can Do In The UI
+- Upload files by dragging and dropping or selecting files.
+- Search, sort, and download past uploads.
+- Create share links and revoke them.
+- Delete files from Telegram and the local list.
 
 ## Known Issues
 Uploading large files to Telegram (more than ~3GB) may result in degraded performance or the system
