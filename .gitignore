@@ -29,5 +29,3 @@ env/
 Thumbs.db
 .vscode/
 .idea/
-
-user-session.*
