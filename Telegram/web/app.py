@@ -84,7 +84,7 @@ def create_app():
     api_id = int(api_id_raw) if api_id_raw else None
     api_hash = os.getenv("APP_HASH")
     channel_link = os.getenv("CHANNEL_LINK")
-    session_string = os.getenv("SESSION_NAME")
+    session_string = os.getenv("SESSION_STRING")
 
     if not all([api_id, api_hash, channel_link, session_string]):
         raise RuntimeError("Missing Telegram credentials. Check .env values.")
