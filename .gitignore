@@ -21,9 +21,6 @@ env/
 .env
 .env.*
 
-# SQLite
-*.db
-
 # OS / editor
 .DS_Store
 Thumbs.db
