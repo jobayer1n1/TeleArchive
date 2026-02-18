@@ -1,9 +1,9 @@
-HTML_PAGE = """<!doctype html>
+﻿HTML_PAGE = """<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Telegram Drop</title>
+    <title>TeleArchive</title>
     <style>
       :root {
         --bg: #0e1014;
@@ -104,6 +104,22 @@ HTML_PAGE = """<!doctype html>
         margin-bottom: 12px;
       }
 
+      .panel-tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .search-input {
+        padding: 6px 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--ink);
+        min-width: 200px;
+      }
+
       .sort-bar {
         display: flex;
         flex-wrap: wrap;
@@ -183,6 +199,15 @@ HTML_PAGE = """<!doctype html>
         display: none;
       }
 
+      #logoutBtn {
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--ink);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        cursor: pointer;
+      }
+
       @media (max-width: 720px) {
         .shell { padding: 28px 14px 44px; }
         .dropzone { padding: 24px; }
@@ -196,6 +221,7 @@ HTML_PAGE = """<!doctype html>
           border-radius: 8px;
           background: rgba(255, 255, 255, 0.06);
         }
+        .search-input { width: 100%; min-width: 0; }
       }
 
       .toast {
@@ -216,8 +242,11 @@ HTML_PAGE = """<!doctype html>
     <div class="shell">
       <header>
         <div>
-          <h1>Telegram Drop</h1>
+          <h1>TeleArchive</h1>
           <div class="status">Drag files here to send them to your channel.</div>
+        </div>
+        <div>
+          <button id="logoutBtn">Logout</button>
         </div>
       </header>
 
@@ -232,10 +261,13 @@ HTML_PAGE = """<!doctype html>
       <section class="panel">
         <div class="panel-header">
           <h2>All uploads</h2>
-          <div class="sort-bar" id="sortBar">
-            <button data-sort="date" data-dir="desc" class="active">Date</button>
-            <button data-sort="size" data-dir="asc">Size</button>
-            <button data-sort="name" data-dir="asc">Alphabetic</button>
+          <div class="panel-tools">
+            <input id="searchInput" class="search-input" type="search" placeholder="Search files..." />
+            <div class="sort-bar" id="sortBar">
+              <button data-sort="date" data-dir="desc" class="active">Date</button>
+              <button data-sort="size" data-dir="asc">Size</button>
+              <button data-sort="name" data-dir="asc">Alphabetic</button>
+            </div>
           </div>
         </div>
         <div class="list" id="fileList"></div>
@@ -247,7 +279,13 @@ HTML_PAGE = """<!doctype html>
       const fileInput = document.getElementById("fileInput");
       const pickButton = document.getElementById("pickButton");
       const fileList = document.getElementById("fileList");
+      const searchInput = document.getElementById("searchInput");
+      const logoutBtn = document.getElementById("logoutBtn");
       const toast = document.getElementById("toast");
+
+      const apiFetch = (url, options = {}) => {
+        return fetch(url, { ...options, credentials: "same-origin" });
+      };
 
       function showToast(message, isError) {
         toast.textContent = message;
@@ -256,22 +294,37 @@ HTML_PAGE = """<!doctype html>
         setTimeout(() => (toast.style.display = "none"), 3200);
       }
 
+      logoutBtn.addEventListener("click", () => {
+        window.location = "/logout";
+      });
+
       let currentSort = "date";
       let currentDir = "desc";
+      let allFiles = [];
+      let currentQuery = "";
 
       async function refreshFiles() {
-        const res = await fetch(`/api/files?sort=${currentSort}&dir=${currentDir}`);
+        const res = await apiFetch(`/api/files?sort=${currentSort}&dir=${currentDir}`);
         const data = await res.json();
         if (!data.ok) {
           showToast(data.error || "Failed to load files", true);
           return;
         }
+        allFiles = data.files || [];
+        renderFiles();
+      }
+
+      function renderFiles() {
+        const q = currentQuery.trim().toLowerCase();
+        const visibleFiles = q
+          ? allFiles.filter((f) => f.name.toLowerCase().includes(q))
+          : allFiles;
         fileList.innerHTML = "";
-        if (!data.files.length) {
-          fileList.innerHTML = "<p>No uploads yet.</p>";
+        if (!visibleFiles.length) {
+          fileList.innerHTML = allFiles.length ? "<p>No matching files.</p>" : "<p>No uploads yet.</p>";
           return;
         }
-        for (const file of data.files) {
+        for (const file of visibleFiles) {
           const el = document.createElement("div");
           el.className = "file";
           const left = document.createElement("div");
@@ -297,7 +350,7 @@ HTML_PAGE = """<!doctype html>
           del.textContent = "Delete";
           del.addEventListener("click", async () => {
             if (!confirm("Delete this file from Telegram and the list?")) return;
-            const resp = await fetch("/delete/" + file.id, { method: "POST" });
+            const resp = await apiFetch("/delete/" + file.id, { method: "POST" });
             const delData = await resp.json();
             if (!delData.ok) {
               showToast(delData.error || "Delete failed", true);
@@ -307,7 +360,51 @@ HTML_PAGE = """<!doctype html>
             refreshFiles();
           });
 
+          const share = document.createElement("button");
+          if (file.share_token) {
+            share.textContent = "Revoke";
+            share.addEventListener("click", async () => {
+              const resp = await apiFetch("/api/share/" + file.id + "/revoke", { method: "POST" });
+              const data = await resp.json();
+              if (!data.ok) {
+                showToast(data.error || "Revoke failed", true);
+                return;
+              }
+              showToast("Share link revoked.");
+              refreshFiles();
+            });
+          } else {
+            share.textContent = "Share";
+            share.addEventListener("click", async () => {
+              const resp = await apiFetch("/api/share/" + file.id, { method: "POST" });
+              const data = await resp.json();
+              if (!data.ok) {
+                showToast(data.error || "Share failed", true);
+                return;
+              }
+              try {
+                await navigator.clipboard.writeText(data.link);
+                showToast("Share link copied!");
+              } catch (e) {
+                const input = document.createElement("input");
+                input.value = data.link;
+                document.body.appendChild(input);
+                input.select();
+                input.setSelectionRange(0, input.value.length);
+                try {
+                  document.execCommand("copy");
+                  showToast("Share link copied!");
+                } catch (err) {
+                  showToast(data.link);
+                }
+                input.remove();
+              }
+              refreshFiles();
+            });
+          }
+
           right.appendChild(download);
+          right.appendChild(share);
           right.appendChild(del);
 
           el.appendChild(left);
@@ -322,7 +419,7 @@ HTML_PAGE = """<!doctype html>
         labelEl.style.display = "block";
         labelEl.textContent = "Downloading... 0 KB/s";
 
-        const startResp = await fetch(`/api/download/${file.id}/start`, { method: "POST" });
+        const startResp = await apiFetch(`/api/download/${file.id}/start`, { method: "POST" });
         const startData = await startResp.json();
         if (!startData.ok) {
           showToast(startData.error || "Download failed", true);
@@ -336,7 +433,7 @@ HTML_PAGE = """<!doctype html>
         const totalBytes = file.size_bytes || 0;
 
         const timer = setInterval(async () => {
-          const statusResp = await fetch(`/api/download/${file.id}/status`);
+          const statusResp = await apiFetch(`/api/download/${file.id}/status`);
           const statusData = await statusResp.json();
           if (!statusData.ok) {
             clearInterval(timer);
@@ -410,7 +507,7 @@ HTML_PAGE = """<!doctype html>
         let smoothRate = 0;
         const smoothing = 0.25;
         const timer = setInterval(async () => {
-          const res = await fetch("/api/progress/" + taskId);
+          const res = await apiFetch("/api/progress/" + taskId);
           const data = await res.json();
           if (!data.ok) {
             clearInterval(timer);
@@ -456,6 +553,7 @@ HTML_PAGE = """<!doctype html>
 
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "/upload", true);
+        xhr.withCredentials = true;
 
         let lastBytes = 0;
         let lastTime = performance.now();
@@ -578,8 +676,14 @@ HTML_PAGE = """<!doctype html>
         refreshFiles();
       });
 
+      searchInput.addEventListener("input", (e) => {
+        currentQuery = e.target.value || "";
+        renderFiles();
+      });
+
       refreshFiles();
     </script>
   </body>
 </html>
 """
+

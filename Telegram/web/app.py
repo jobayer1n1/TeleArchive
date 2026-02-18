@@ -1,11 +1,14 @@
-import os
+﻿import os
 import time
 import uuid
 import threading
+import secrets
+import base64
+import hashlib
 from io import BytesIO
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_file, Response
+from flask import Flask, jsonify, request, send_file, Response, session, redirect
 from werkzeug.utils import secure_filename
 
 from Telegram.teleBot import TelegramFileClient
@@ -25,6 +28,55 @@ def _format_time(ts):
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
 
 
+def _escape_like(value):
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _b64e(data):
+    return base64.urlsafe_b64encode(data).decode("utf-8")
+
+
+def _b64d(data):
+    return base64.urlsafe_b64decode(data.encode("utf-8"))
+
+
+def _hash_passkey(passkey, salt):
+    return hashlib.pbkdf2_hmac("sha256", passkey.encode("utf-8"), salt, 200_000)
+
+
+def _login_page(error=None):
+    err_html = f"<div class='error'>{error}</div>" if error else ""
+    return f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login</title>
+    <style>
+      body {{ margin:0; font-family: 'Segoe UI', Arial, sans-serif; background:#0e1014; color:#e9edf5; }}
+      .wrap {{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }}
+      .card {{ background:#151922; padding:28px; border-radius:16px; width:100%; max-width:420px; box-shadow:0 16px 36px rgba(0,0,0,0.35); }}
+      h1 {{ margin:0 0 12px; }}
+      p {{ color:#96a2b8; margin:0 0 16px; }}
+      input {{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#e9edf5; }}
+      button {{ margin-top:14px; width:100%; padding:10px 12px; border-radius:10px; border:none; background:#4fe3c1; color:#081014; font-weight:600; cursor:pointer; }}
+      .error {{ background:rgba(255,107,107,0.2); color:#e9edf5; padding:10px; border-radius:10px; margin-bottom:12px; }}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <form class="card" method="post" action="/login">
+        <h1>TeleArchive Login</h1>
+        <p>Enter the passkey to access your files.</p>
+        {err_html}
+        <input name="passkey" type="password" placeholder="Passkey" required />
+        <button type="submit">Enter</button>
+      </form>
+    </div>
+  </body>
+</html>"""
+
+
 def create_app():
     load_dotenv()
 
@@ -40,7 +92,22 @@ def create_app():
     client = TelegramFileClient(session_name, api_id, api_hash, channel_link)
     store = WebStore(os.getenv("WEB_DB_PATH", "telegram_web.db"))
 
+    salt_b64 = store.get_config("passkey_salt")
+    hash_b64 = store.get_config("passkey_hash")
+    if not salt_b64 or not hash_b64:
+        env_passkey = os.getenv("PASSKEY")
+        if not env_passkey:
+            raise RuntimeError("PASSKEY is not set. Add PASSKEY to your .env and restart.")
+        salt = secrets.token_bytes(16)
+        h = _hash_passkey(env_passkey, salt)
+        store.set_config("passkey_salt", _b64e(salt))
+        store.set_config("passkey_hash", _b64e(h))
+        salt_b64 = _b64e(salt)
+        hash_b64 = _b64e(h)
+
     app = Flask(__name__)
+    app.secret_key = os.getenv("WEB_SECRET") or hash_b64
+
     max_upload = os.getenv("WEB_MAX_UPLOAD_BYTES")
     if max_upload:
         app.config["MAX_CONTENT_LENGTH"] = int(max_upload)
@@ -49,6 +116,46 @@ def create_app():
     download_progress = {}
     store_lock = threading.Lock()
     download_lock = threading.Lock()
+
+    def is_authed():
+        return session.get("authed") is True
+
+    @app.before_request
+    def _guard():
+        path = request.path
+        if path.startswith("/share/"):
+            return None
+        if path.startswith("/login") or path.startswith("/logout"):
+            return None
+        if path.startswith("/static/"):
+            return None
+        if path.startswith("/api/"):
+            if not is_authed():
+                return jsonify(ok=False, error="Unauthorized"), 401
+            return None
+        if not is_authed():
+            return redirect("/login")
+        return None
+
+    @app.get("/login")
+    def login_form():
+        return _login_page()
+
+    @app.post("/login")
+    def login_submit():
+        passkey = (request.form.get("passkey") or "").strip()
+        salt = _b64d(salt_b64)
+        expected = _b64d(hash_b64)
+        if passkey and _hash_passkey(passkey, salt) == expected:
+            session.clear()
+            session["authed"] = True
+            return redirect("/")
+        return _login_page("Invalid passkey.")
+
+    @app.get("/logout")
+    def logout():
+        session.clear()
+        return redirect("/login")
 
     @app.get("/")
     def index():
@@ -59,12 +166,15 @@ def create_app():
         limit = int(request.args.get("limit", "50"))
         sort = request.args.get("sort", "date")
         direction = request.args.get("dir", "desc")
+        query = request.args.get("q")
         if sort not in ("date", "size", "name"):
             sort = "date"
         if direction not in ("asc", "desc"):
             direction = "desc"
+        if query:
+            query = _escape_like(query.strip())
         with store_lock:
-            rows = store.list_files(limit, sort, direction)
+            rows = store.list_files(limit, sort, direction, query=query)
         files = [
             {
                 "id": row[0],
@@ -72,10 +182,54 @@ def create_app():
                 "size_bytes": row[2],
                 "size_human": _format_bytes(row[2]),
                 "uploaded_at": _format_time(row[3]),
+                "share_token": row[4],
             }
             for row in rows
         ]
         return jsonify(ok=True, files=files)
+
+    @app.post("/api/share/<int:file_id>")
+    def create_share(file_id):
+        with store_lock:
+            row = store.get_file(file_id)
+        if not row:
+            return jsonify(ok=False, error="File not found"), 404
+        token = secrets.token_urlsafe(32)
+        with store_lock:
+            store.revoke_share_token(file_id)
+            store.create_share_token(file_id, token, int(time.time()))
+        link = request.host_url.rstrip("/") + "/share/" + token
+        return jsonify(ok=True, link=link, token=token)
+
+    @app.post("/api/share/<int:file_id>/revoke")
+    def revoke_share(file_id):
+        with store_lock:
+            row = store.get_file(file_id)
+        if not row:
+            return jsonify(ok=False, error="File not found"), 404
+        with store_lock:
+            store.revoke_share_token(file_id)
+        return jsonify(ok=True)
+
+    @app.get("/share/<token>")
+    def download_shared(token):
+        row = store.get_file_by_token(token)
+        if not row:
+            return "Invalid or expired link", 404
+        payload = client.download_file(row["id"], row["msg_ids"])
+        if isinstance(payload, bytearray):
+            payload = bytes(payload)
+        resp = send_file(
+            BytesIO(payload),
+            as_attachment=True,
+            download_name=row["file_name"],
+            mimetype="application/octet-stream",
+            max_age=0,
+            conditional=False,
+        )
+        resp.headers["Content-Length"] = str(len(payload))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     @app.get("/api/progress/<task_id>")
     def get_progress(task_id):
