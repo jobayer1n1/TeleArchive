@@ -4,7 +4,6 @@ Though Telegram allows file uploads, it is not intended to be used as cloud stor
 # Telegram Drop (Local Web UI)
 A local web app that lets you drag-and-drop files and send them to a Telegram channel, plus download recent uploads.
 
-Though I demonstrated Discord in the video too, I haven't included the code here. While I believe that storing your OWN files on Discord does NOT violate TOS, I think that spreading the code to do so might. Idk I'm trying to not actually get banned :)
 
 ## Usage and How to Run
 ### Requirements
@@ -16,12 +15,12 @@ Though I demonstrated Discord in the video too, I haven't included the code here
 Before running this, I recommend creating a virtual environment in Python.
 
 - (optional) Create a venv with `python -m venv <your-env-name>`
-- Create `Telegram/.env` and fill in the variables with appropriate values. Here's a description of these values and where you can get them from:
+- Create `/.env` and fill in the variables with appropriate values. Here's a description of these values and where you can get them from:
     - `APP_ID` and `APP_HASH`: You can get these from https://my.telegram.org/myapp. **AGAIN, storing large amounts of files could get you banned. So be careful and take precautions if you care about losing your account.**
     - `CHANNEL_LINK`: the link to your Telegram channel.
     - `SESSION_NAME`: this can be whatever you want, just the name that will be used for the file storing details of your Telegram session.
 - Run `pip install -r requirements.txt`.
-- Run `python Telegram/main.py`
+- Run `python run.py`
 - Open `http://127.0.0.1:5000` in your browser.
 
 ## Known Issues
