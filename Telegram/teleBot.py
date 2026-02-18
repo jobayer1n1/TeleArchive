@@ -10,6 +10,7 @@ from cryptography.fernet import Fernet
 from collections import defaultdict
 from cachetools import LRUCache
 import gc
+from telethon.sessions import StringSession
 
 load_dotenv()
 
@@ -36,7 +37,13 @@ class TelegramFileClient():
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
 
-        self.client = TelegramClient(session_name, api_id, api_hash, loop=self.loop)
+        session_string = os.getenv("SESSION_STRING")
+        self.client = TelegramClient(
+            StringSession(session_string),
+            api_id,
+            api_hash,
+            loop=self.loop
+        )
         # Make sure Telethon uses our loop even in newer versions.
         try:
             self.client._loop = self.loop
