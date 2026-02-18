@@ -1,7 +1,6 @@
 import logging
 import asyncio
 import threading
-import concurrent.futures
 logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
 from telethon import TelegramClient
 from dotenv import load_dotenv
