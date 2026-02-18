@@ -92,18 +92,15 @@ def create_app():
     client = TelegramFileClient(session_name, api_id, api_hash, channel_link)
     store = WebStore(os.getenv("WEB_DB_PATH", "telegram_web.db"))
 
-    salt_b64 = store.get_config("passkey_salt")
-    hash_b64 = store.get_config("passkey_hash")
-    if not salt_b64 or not hash_b64:
-        env_passkey = os.getenv("PASSKEY")
-        if not env_passkey:
-            raise RuntimeError("PASSKEY is not set. Add PASSKEY to your .env and restart.")
-        salt = secrets.token_bytes(16)
-        h = _hash_passkey(env_passkey, salt)
-        store.set_config("passkey_salt", _b64e(salt))
-        store.set_config("passkey_hash", _b64e(h))
-        salt_b64 = _b64e(salt)
-        hash_b64 = _b64e(h)
+    env_passkey = os.getenv("PASSKEY")
+    if not env_passkey:
+        raise RuntimeError("PASSKEY is not set. Add PASSKEY to your .env and restart.")
+    salt = secrets.token_bytes(16)
+    h = _hash_passkey(env_passkey, salt)
+    store.set_config("passkey_salt", _b64e(salt))
+    store.set_config("passkey_hash", _b64e(h))
+    salt_b64 = _b64e(salt)
+    hash_b64 = _b64e(h)
 
     app = Flask(__name__)
     app.secret_key = os.getenv("WEB_SECRET") or hash_b64
