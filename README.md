@@ -1,8 +1,8 @@
 # Keep In Mind
 Though Telegram allows file uploads, it is not intended to be used as cloud storage. Your files could be lost at any time. Don't rely on this project (or any similar ones) for storing important files on Telegram. Storing large amounts of files on this **could result in Telegram deleting your files or banning you, proceed at your own risk**.
 
-# TeleArchive (Local Web UI)
-A local web app that lets you drag-and-drop files to a Telegram channel, browse/download recent uploads, and create shareable download links.
+# TeleArchive Web UI)
+A web app that lets you drag-and-drop files to a Telegram channel, browse/download recent uploads, and create shareable download links.
 
 
 ## Usage and How to Run
@@ -31,11 +31,14 @@ Before running this, I recommend creating a virtual environment in Python.
 - Run `python run.py`
 - Open `http://127.0.0.1:5000` in your browser.
 
+### Deploy It Through Replit(free) 🥳
+
 ### What You Can Do In The UI
 - Upload files by dragging and dropping or selecting files.
 - Search, sort, and download past uploads.
 - Create share links and revoke them.
 - Delete files from Telegram and the local list.
+
 
 ## Known Issues
 Uploading large files to Telegram (more than ~3GB) may result in degraded performance or the system
