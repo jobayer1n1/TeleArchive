@@ -1,7 +1,7 @@
 # Keep In Mind
 Though Telegram allows file uploads, it is not intended to be used as cloud storage. Your files could be lost at any time. Don't rely on this project (or any similar ones) for storing important files on Telegram. Storing large amounts of files on this **could result in Telegram deleting your files or banning you, proceed at your own risk**.
 
-# TeleArchive Web UI)
+# TeleArchive (Web UI)
 A web app that lets you drag-and-drop files to a Telegram channel, browse/download recent uploads, and create shareable download links.
 
 
