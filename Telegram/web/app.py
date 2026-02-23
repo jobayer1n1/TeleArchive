@@ -5,15 +5,15 @@ import threading
 import secrets
 import base64
 import hashlib
+from pathlib import Path
 from io import BytesIO
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_file, Response, session, redirect
+from flask import Flask, jsonify, request, send_file, send_from_directory, session, redirect
 from werkzeug.utils import secure_filename
 
 from Telegram.teleBot import TelegramFileClient
 from Telegram.web.storage import WebStore
-from Telegram.web.ui import HTML_PAGE
 
 
 def _format_bytes(value):
@@ -44,39 +44,6 @@ def _hash_passkey(passkey, salt):
     return hashlib.pbkdf2_hmac("sha256", passkey.encode("utf-8"), salt, 200_000)
 
 
-def _login_page(error=None):
-    err_html = f"<div class='error'>{error}</div>" if error else ""
-    return f"""<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Login</title>
-    <style>
-      body {{ margin:0; font-family: 'Segoe UI', Arial, sans-serif; background:#0e1014; color:#e9edf5; }}
-      .wrap {{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }}
-      .card {{ background:#151922; padding:28px; border-radius:16px; width:100%; max-width:420px; box-shadow:0 16px 36px rgba(0,0,0,0.35); }}
-      h1 {{ margin:0 0 12px; }}
-      p {{ color:#96a2b8; margin:0 0 16px; }}
-      input {{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#e9edf5; }}
-      button {{ margin-top:14px; width:100%; padding:10px 12px; border-radius:10px; border:none; background:#4fe3c1; color:#081014; font-weight:600; cursor:pointer; }}
-      .error {{ background:rgba(255,107,107,0.2); color:#e9edf5; padding:10px; border-radius:10px; margin-bottom:12px; }}
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <form class="card" method="post" action="/login">
-        <h1>TeleArchive Login</h1>
-        <p>Enter the passkey to access your files.</p>
-        {err_html}
-        <input name="passkey" type="password" placeholder="Passkey" required />
-        <button type="submit">Enter</button>
-      </form>
-    </div>
-  </body>
-</html>"""
-
-
 def create_app():
     load_dotenv()
 
@@ -104,6 +71,9 @@ def create_app():
 
     app = Flask(__name__)
     app.secret_key = os.getenv("WEB_SECRET") or hash_b64
+    frontend_root = Path(__file__).resolve().parents[2] / "frontend"
+    home_dir = frontend_root / "home"
+    login_dir = frontend_root / "login"
 
     max_upload = os.getenv("WEB_MAX_UPLOAD_BYTES")
     if max_upload:
@@ -124,6 +94,8 @@ def create_app():
             return None
         if path.startswith("/login") or path.startswith("/logout"):
             return None
+        if path.startswith("/frontend/"):
+            return None
         if path.startswith("/static/"):
             return None
         if path.startswith("/api/"):
@@ -136,7 +108,7 @@ def create_app():
 
     @app.get("/login")
     def login_form():
-        return _login_page()
+        return send_from_directory(login_dir, "index.html")
 
     @app.post("/login")
     def login_submit():
@@ -147,7 +119,7 @@ def create_app():
             session.clear()
             session["authed"] = True
             return redirect("/")
-        return _login_page("Invalid passkey.")
+        return redirect("/login?error=Invalid%20passkey")
 
     @app.get("/logout")
     def logout():
@@ -156,7 +128,11 @@ def create_app():
 
     @app.get("/")
     def index():
-        return HTML_PAGE
+        return send_from_directory(home_dir, "index.html")
+
+    @app.get("/frontend/<path:filename>")
+    def frontend_assets(filename):
+        return send_from_directory(frontend_root, filename)
 
     @app.get("/api/files")
     def list_files():

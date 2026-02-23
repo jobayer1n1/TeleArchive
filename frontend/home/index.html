@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TeleArchive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/frontend/home/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div>
+          <h1>TeleArchive</h1>
+          <div class="status">Drag files here to send them to your channel.</div>
+        </div>
+        <button id="logoutBtn" class="btn btn-secondary" type="button">Logout</button>
+      </header>
+
+      <section class="dropzone" id="dropzone">
+        <h2>Drop files to upload</h2>
+        <p>Or click the button to choose files.</p>
+        <button id="pickButton" class="btn btn-primary" type="button">Select files</button>
+        <input id="fileInput" type="file" multiple hidden />
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>All uploads</h2>
+          <div class="panel-tools">
+            <input id="searchInput" class="search-input" type="search" placeholder="Search files..." />
+            <div class="sort-bar" id="sortBar">
+              <button data-sort="date" data-dir="desc" class="active">Date</button>
+              <button data-sort="size" data-dir="asc">Size</button>
+              <button data-sort="name" data-dir="asc">Alphabetic</button>
+            </div>
+          </div>
+        </div>
+        <div class="list" id="fileList"></div>
+      </section>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script src="/frontend/home/app.js"></script>
+  </body>
+</html>
